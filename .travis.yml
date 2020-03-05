@@ -1,8 +1,6 @@
 language: node_js
 sudo: false
 node_js:
-  - "6"
-  - "8"
   - "10"
   - "12"
   - "13"
@@ -62,7 +60,7 @@ script:
 jobs:
   include:
     - stage: lint
-      node_js: 8
+      node_js: 12
       before_install: skip
       before_script: skip
       script:
@@ -70,7 +68,7 @@ jobs:
         - commitlint-travis
 
     - stage: azure
-      node_js: 8
+      node_js: 12
       before_install:
       - mkdir ~/.tedious
       - >
@@ -93,7 +91,7 @@ jobs:
       script: npx nyc --reporter=lcov npm run test-integration && npx codecov
 
     - stage: azure
-      node_js: 8
+      node_js: 12
       before_install:
       - mkdir ~/.tedious
       - >
@@ -122,7 +120,7 @@ jobs:
       script: npm run semantic-release
 
     - stage: tag-latest
-      node_js: 8
+      node_js: 12
       before_install:
         - echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > .npmrc
       before_script: skip
