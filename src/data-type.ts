@@ -51,6 +51,13 @@ export interface Parameter {
   precision?: number;
   scale?: number;
 
+  collation?: {
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
+
   nullable?: boolean;
 }
 
@@ -58,6 +65,13 @@ export interface ParameterData<T = any> {
   length?: number;
   scale?: number;
   precision?: number;
+
+  collation?: {
+    lcid: number;
+    flags: number;
+    version: number;
+    sortId: number;
+  };
 
   value: T;
 }
