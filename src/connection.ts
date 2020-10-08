@@ -3185,6 +3185,7 @@ class Connection extends EventEmitter {
         if (!request.streamingMode) {
           request.on('cancel', () => {
             this.transitionTo(this.STATE.LOGGED_IN);
+            // eslint-disable-next-line
             return;
           });
           request.rowToPacketTransform.end();
