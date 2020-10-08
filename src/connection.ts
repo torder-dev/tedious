@@ -3185,6 +3185,7 @@ class Connection extends EventEmitter {
         if (!request.streamingMode) {
           request.on('cancel', () => {
             this.transitionTo(this.STATE.LOGGED_IN);
+            return;
           });
           request.rowToPacketTransform.end();
         }
@@ -3623,11 +3624,11 @@ Connection.prototype.STATE = {
     events: {
       socketError: function() {
         this.transitionTo(this.STATE.FINAL);
-      },
+      }/* ,
       data: function() {                        // Discards incoming data. Can occur if bulkLoad is canceled and data event is still emitted afterwards.
       },
       message: function() {                     // Like above, catch unused 'message' event. Can occur if bulkLoad is canceled and message event is still emitted afterwards
-      }
+      } */
     }
   },
   SENT_CLIENT_REQUEST: {
