@@ -556,7 +556,7 @@ describe('Bulk Load Tests', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should throw `RequestError: Connection closed before request completed` after 1000ms', function(done) {
+  it('should throw `RequestError: Connection closed before request completed` after 2000ms', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, function(err, rowCount) {
       if (err) {
         assert.strictEqual(err.name, 'RequestError');
