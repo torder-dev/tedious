@@ -367,6 +367,8 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  validateBulkLoadParameters: boolean;
+  workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
 
@@ -597,7 +599,7 @@ interface ConnectionOptions {
    * See [documentation](https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017)
    * for more details.
    *
-   * (default: `false`)
+   * (default: `true`)
    */
   enableArithAbort?: boolean;
 
@@ -803,6 +805,22 @@ interface ConnectionOptions {
    * (default: `true`).
    */
   useUTC?: boolean;
+
+  /**
+   * A boolean determining whether BulkLoad parameters should be validated.
+   *
+   * (default: `false`).
+   */
+  validateBulkLoadParameters?: boolean;
+
+  /**
+   * The workstation ID (WSID) of the client, default os.hostname().
+   * Used for identifying a specific client in profiling, logging or
+   * tracing client activity in SQLServer.
+   *
+   * The value is reported by the TSQL function HOST_NAME().
+   */
+  workstationId?: string | undefined;
 
   /**
    * A boolean determining whether to parse unique identifier type with lowercase case characters.
@@ -1226,6 +1244,8 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
+        validateBulkLoadParameters: false,
+        workstationId: undefined,
         lowerCaseGuids: false
       }
     };
@@ -1619,6 +1639,24 @@ class Connection extends EventEmitter {
         this.config.options.useUTC = config.options.useUTC;
       }
 
+      if (config.options.validateBulkLoadParameters !== undefined) {
+        if (typeof config.options.validateBulkLoadParameters !== 'boolean') {
+          throw new TypeError('The "config.options.validateBulkLoadParameters" property must be of type boolean.');
+        }
+
+        this.config.options.validateBulkLoadParameters = config.options.validateBulkLoadParameters;
+      } else {
+        deprecate('The default value for "config.options.validateBulkLoadParameters" will change from `false` to `true` in the next major version of `tedious`. Set the value to `true` or `false` explicitly to silence this message.');
+      }
+
+      if (config.options.workstationId !== undefined) {
+        if (typeof config.options.workstationId !== 'string') {
+          throw new TypeError('The "config.options.workstationId" property must be of type string.');
+        }
+
+        this.config.options.workstationId = config.options.workstationId;
+      }
+
       if (config.options.lowerCaseGuids !== undefined) {
         if (typeof config.options.lowerCaseGuids !== 'boolean') {
           throw new TypeError('The "config.options.lowerCaseGuids" property must be of type boolean.');
@@ -1684,7 +1722,18 @@ class Connection extends EventEmitter {
     }
 
     if (connectListener) {
-      this.once('connect', connectListener);
+      const onConnect = (err?: Error) => {
+        this.removeListener('error', onError);
+        connectListener(err);
+      };
+
+      const onError = (err: Error) => {
+        this.removeListener('connect', onConnect);
+        connectListener(err);
+      };
+
+      this.once('connect', onConnect);
+      this.once('error', onError);
     }
 
     this.transitionTo(this.STATE.CONNECTING);
@@ -2198,6 +2247,9 @@ class Connection extends EventEmitter {
       this.messageIo.on('data', (data) => { this.dispatchEvent('data', data); });
       this.messageIo.on('message', () => { this.dispatchEvent('message'); });
       this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+      this.messageIo.on('error', (error) => {
+        this.socketError(error);
+      });
 
       this.socket = socket;
       this.socketConnect();
@@ -2519,7 +2571,7 @@ class Connection extends EventEmitter {
         payload.password = authentication.options.password;
     }
 
-    payload.hostname = os.hostname();
+    payload.hostname = this.config.options.workstationId || os.hostname();
     payload.serverName = this.routingData ? this.routingData.server : this.config.server;
     payload.appName = this.config.options.appName || 'Tedious';
     payload.libraryName = libraryName;

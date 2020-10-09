@@ -4,6 +4,7 @@ const Request = require('../../src/request');
 const fs = require('fs');
 const homedir = require('os').homedir();
 const assert = require('chai').assert;
+const os = require('os');
 
 function getConfig() {
   const config = JSON.parse(
@@ -48,16 +49,16 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
-      assert.ok(err);
-    });
-
     connection.on('end', function(info) {
       done();
     });
 
-    return connection.on('debug', function(text) {
+    connection.on('debug', function(text) {
       // console.log(text)
+    });
+
+    connection.connect(function(err) {
+      assert.ok(err);
     });
   });
 
@@ -81,12 +82,6 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
-      assert.ok(err);
-
-      connection.close();
-    });
-
     connection.on('end', function(info) {
       done();
     });
@@ -100,11 +95,15 @@ describe('Initiate Connect Test', function() {
       return assert.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
     });
 
-    return connection.on(
-      'debug',
-      function(text) { }
+    connection.on('debug', function(text) {
       // console.log(text)
-    );
+    });
+
+    connection.connect(function(err) {
+      assert.ok(err);
+
+      connection.close();
+    });
   });
 
   it('should connect by port', function(done) {
@@ -117,7 +116,7 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
 
       connection.close();
@@ -152,7 +151,7 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
 
       connection.close();
@@ -187,7 +186,7 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ok(err);
 
       connection.close();
@@ -286,12 +285,68 @@ describe('Initiate Connect Test', function() {
     };
 
     const connection = new Connection(config);
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ok(err);
       assert.strictEqual(err.code, 'ESOCKET');
     });
 
     connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('should use the local hostname as the default workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, os.hostname());
+    });
+
+    let connection = new Connection(config);
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('should allow specifying a custom workstation identifier', function(done) {
+    const config = getConfig();
+
+    const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns.length, 1);
+      assert.strictEqual(columns[0].value, 'foo.bar.baz');
+    });
+
+    let connection = new Connection({ ...config, options: { ...config.options, workstationId: 'foo.bar.baz' } });
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
       done();
     });
   });
@@ -302,7 +357,7 @@ describe('Initiate Connect Test', function() {
 
     const connection = new Connection(config);
     connection.on('error', (error) => { assert.ifError(error); });
-    connection.on('connect', (err) => { });
+    connection.connect((err) => { });
 
     setTimeout(() => { done(); }, 500);
   });
@@ -339,7 +394,7 @@ describe('Ntlm Test', function() {
 
     const connection = new Connection(ntlmConfig);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
 
       connection.close();
@@ -378,7 +433,7 @@ describe('Encrypt Test', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
 
       connection.close();
@@ -413,7 +468,7 @@ describe('BeginTransaction Tests', function() {
   beforeEach(function(done) {
     const config = getConfig();
     connection = new Connection(config);
-    connection.on('connect', done);
+    connection.connect(done);
   });
 
   afterEach(function(done) {
@@ -476,7 +531,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -515,7 +570,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -559,7 +614,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -614,7 +669,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       execSql();
     });
 
@@ -664,7 +719,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -696,7 +751,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -724,7 +779,7 @@ describe('Insertion Tests', function() {
 
     const connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSql(request);
 
@@ -774,7 +829,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -810,7 +865,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -848,7 +903,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -896,7 +951,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -938,7 +993,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -993,7 +1048,7 @@ describe('Insertion Tests', function() {
       assert.ok(true);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       async.series([
         testAnsiNullsOptionOn,
         setAnsiNullsOptionOff,
@@ -1063,7 +1118,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
       setTimeout(connection.cancel.bind(connection), 2000);
     });
@@ -1116,7 +1171,7 @@ describe('Insertion Tests', function() {
 
     let connection = new Connection(config);
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       connection.execSql(request);
     });
 
@@ -1143,7 +1198,7 @@ describe('Advanced Input Test', function() {
       connection.close();
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSqlBatch(request);
     });
@@ -1202,7 +1257,7 @@ describe('Date Insert Test', function() {
       assert.strictEqual(dateFirstActual, datefirst);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSql(request);
     });
@@ -1253,7 +1308,7 @@ describe('Language Insert Test', function() {
       assert.strictEqual(languageActual, language);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSql(request);
     });
@@ -1294,7 +1349,7 @@ describe('should test date format', function() {
       assert.strictEqual(dateFormatActual, dateFormat);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
       connection.execSql(request);
     });
@@ -1347,7 +1402,7 @@ describe('Boolean Config Options Test', function() {
       assert.strictEqual(columns[0].value, expectedValue);
     });
 
-    connection.on('connect', function(err) {
+    connection.connect(function(err) {
       assert.ifError(err);
 
       connection.execSql(request);
