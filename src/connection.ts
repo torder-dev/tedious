@@ -254,6 +254,11 @@ interface AzureActiveDirectoryPasswordAuthentication {
      * A user need to provide `password` asscoiate to their account.
      */
     password: string;
+
+    /**
+     * Optional parameter for specific Azure tenant ID
+     */
+    domain: string;
   };
 }
 
@@ -397,12 +402,12 @@ interface State {
 }
 
 type Authentication = DefaultAuthentication |
-                      NtlmAuthentication |
-                      AzureActiveDirectoryPasswordAuthentication |
-                      AzureActiveDirectoryMsiAppServiceAuthentication |
-                      AzureActiveDirectoryMsiVmAuthentication |
-                      AzureActiveDirectoryAccessTokenAuthentication |
-                      AzureActiveDirectoryServicePrincipalSecret;
+  NtlmAuthentication |
+  AzureActiveDirectoryPasswordAuthentication |
+  AzureActiveDirectoryMsiAppServiceAuthentication |
+  AzureActiveDirectoryMsiVmAuthentication |
+  AzureActiveDirectoryAccessTokenAuthentication |
+  AzureActiveDirectoryServicePrincipalSecret;
 
 type AuthenticationType = Authentication['type'];
 
@@ -446,7 +451,7 @@ interface DebugOptions {
    * (default: `false`)
    */
   token: boolean;
-  }
+}
 
 interface AuthenticationOptions {
   /**
@@ -455,19 +460,19 @@ interface AuthenticationOptions {
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
    * or `azure-active-directory-service-principal-secret`
    */
-   type?: AuthenticationType;
-   /**
-    * Different options for authentication types:
-    *
-    * * `default`: [[DefaultAuthentication.options]]
-    * * `ntlm` :[[NtlmAuthentication]]
-    * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
-    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
-    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
-    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
-    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
-    */
-   options?: any;
+  type?: AuthenticationType;
+  /**
+   * Different options for authentication types:
+   *
+   * * `default`: [[DefaultAuthentication.options]]
+   * * `ntlm` :[[NtlmAuthentication]]
+   * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
+   * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
+   * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
+   * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
+   * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
+   */
+  options?: any;
 }
 
 interface ConnectionOptions {
@@ -543,7 +548,7 @@ interface ConnectionOptions {
    *
    * (default: `{}`)
    */
-  cryptoCredentialsDetails?: {};
+  cryptoCredentialsDetails?: SecureContextOptions;
 
   /**
    * Database to connect to (default: dependent on server configuration).
@@ -1095,6 +1100,7 @@ class Connection extends EventEmitter {
           options: {
             userName: options.userName,
             password: options.password,
+            domain: options.domain,
           }
         };
       } else if (type === 'azure-active-directory-access-token') {
@@ -3530,16 +3536,16 @@ Connection.prototype.STATE = {
               if (err) {
                 return callback(err);
               }
-
-              credentials!.getToken().then((tokenResponse) => {
-                callback(null, tokenResponse.accessToken);
-              }, callback);
+                credentials!.getToken().then((tokenResponse: { accessToken: string | undefined }) => {
+                  callback(null, tokenResponse.accessToken);
+                }, callback);
             };
 
             if (authentication.type === 'azure-active-directory-password') {
               loginWithUsernamePassword(authentication.options.userName, authentication.options.password, {
                 clientId: '7f98cb04-cd1e-40df-9140-3bf7e2cea4db',
-                tokenAudience: fedAuthInfoToken.spn
+                tokenAudience: fedAuthInfoToken.spn,
+                domain: authentication.options.domain
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-msi-vm') {
               loginWithVmMSI({
@@ -3551,7 +3557,8 @@ Connection.prototype.STATE = {
               loginWithAppServiceMSI({
                 msiEndpoint: authentication.options.msiEndpoint,
                 msiSecret: authentication.options.msiSecret,
-                resource: fedAuthInfoToken.spn
+                resource: fedAuthInfoToken.spn,
+                clientId: authentication.options.clientId
               }, getTokenFromCredentials);
             } else if (authentication.type === 'azure-active-directory-service-principal-secret') {
               loginWithServicePrincipalSecret(
