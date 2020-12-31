@@ -77,6 +77,10 @@ module.exports = {
       if (typeof value.toString !== 'function') {
         return TypeError('Invalid string.');
       }
+
+      if(value instanceof Buffer)
+	return value;
+	
       value = value.toString();
     }
     return value;
